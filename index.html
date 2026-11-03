@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14283f"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<title>sUAS Flight Logger</title><link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header><div class="eyebrow">PERSONAL FLIGHT RECORDS</div><h1>sUAS Flight Logger</h1><div id="connection" class="status">● Offline-ready · Local storage</div></header>
+<main>
+<section class="panel" id="entryPanel">
+<h2>Flight entry</h2>
+<label>Pilot / Operator<input id="pilot" value="Jacob Griffin" autocomplete="name"></label>
+<div class="grid">
+<label>Aircraft<select id="aircraft"><option>Mini 3</option><option>Air 3s</option><option>Matrice 210</option><option>Matrice 4TD</option></select></label>
+<label>Controller<select id="controller"><option>Remote</option><option>Dronesense</option></select></label>
+<label>Flight type<select id="flightType"><option>LOS</option><option>BVLOS</option></select></label>
+<label>Operation type<select id="operation"><option>Training</option><option>Emergency Response</option><option>Search &amp; Rescue</option><option>Incident Overwatch</option><option>Mapping / Survey</option><option>Test / Maintenance</option><option>Other</option></select></label>
+</div>
+<label>Location / Operation<input id="location" placeholder="Enter location or incident"></label>
+<label>Notes<textarea id="notes" rows="2" placeholder="Optional notes"></textarea></label>
+<div id="active" class="active hidden"><div class="active-label">FLIGHT IN PROGRESS</div><div id="startedAt" class="started"></div><div id="elapsed" class="elapsed">00:00:00</div></div>
+<div class="actions"><button id="start" class="start">START FLIGHT</button><button id="end" class="end" disabled>END FLIGHT</button></div>
+<p id="message" class="message" role="status">Your records are saved on this device.</p>
+</section>
+<section class="panel">
+<div class="section-head"><h2>Flight history</h2><button id="export" class="secondary">Export CSV</button></div>
+<div class="stats"><div><strong id="flightCount">0</strong><span>Flights</span></div><div><strong id="totalHours">0.00</strong><span>Flight hours</span></div></div>
+<div id="history" class="history"><p class="empty">No completed flights yet.</p></div>
+</section>
+<section class="footnote">This first version stores records locally on this iPhone/browser. Export a CSV regularly for backup. Google account synchronization and shared pilot accounts are planned as the next phase.</section>
+</main>
+<script src="app.js"></script>
+</body></html>
