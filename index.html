@@ -10,6 +10,12 @@
 <body>
 <header><div class="eyebrow">PERSONAL FLIGHT RECORDS</div><h1>sUAS Flight Logger</h1><div id="connection" class="status">● Offline-ready · Local storage</div></header>
 <main>
+<section class="panel" id="syncPanel">
+<h2>Google Sheets sync</h2>
+<p class="sync-note">Connect your Google account to create a private flight log spreadsheet. Flights remain saved on this device and can sync when you are back online.</p>
+<div class="sync-actions"><button id="connectGoogle" class="secondary">CONNECT GOOGLE ACCOUNT</button><button id="syncNow" class="secondary" disabled>SYNC FLIGHTS</button></div>
+<p id="syncMessage" class="message" role="status">Not connected. Local flight logging works offline.</p>
+</section>
 <section class="panel" id="entryPanel">
 <h2>Flight entry</h2>
 <label>Pilot / Operator<input id="pilot" value="Jacob Griffin" autocomplete="name"></label>
@@ -32,5 +38,7 @@
 </section>
 <section class="footnote">This first version stores records locally on this iPhone/browser. Export a CSV regularly for backup. Google account synchronization and shared pilot accounts are planned as the next phase.</section>
 </main>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>window.GOOGLE_OAUTH_CLIENT_ID = "615484333604-velouc741rmhu9vlt9jko8o1ae6m2v49.apps.googleusercontent.com";</script>
 <script src="app.js"></script>
 </body></html>
