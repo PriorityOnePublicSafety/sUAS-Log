@@ -31,3 +31,7 @@ DEPLOY
 OFFLINE
 - Start/end flights offline as before.
 - When back online, reconnect Google if needed and tap Sync Flights.
+
+
+SHARED GOOGLE SHEET CONFIGURATION
+This build is configured to use one shared master spreadsheet ID across all devices. Do not change MASTER_SHEET_ID in app.js unless intentionally changing the master spreadsheet. The app will append records to the Flights tab in that spreadsheet. Keep the spreadsheet private in the Google account that authorized the app.

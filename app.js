@@ -1,5 +1,6 @@
 const DB="suas-flight-logger", STORE="records", ACTIVE="activeFlight";
 const SHEET_KEY="suasGoogleSheetId";
+const MASTER_SHEET_ID="1lNUgg_z4n8huxdvIssJ-czXcaoI8drAEHFd-u0x3HoQ";
 let db, active=null, tick=null, tokenClient=null, accessToken=null, syncing=false;
 const $=id=>document.getElementById(id);
 function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:"id"});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
@@ -21,12 +22,13 @@ function initGoogle(){if(!window.google?.accounts?.oauth2){setSyncMessage("Googl
 $("connectGoogle").addEventListener("click",()=>{if(!tokenClient){if(window.google?.accounts?.oauth2)initGoogle();else setSyncMessage("Google sign-in is still loading. Please try again in a moment.");}else tokenClient.requestAccessToken({prompt:""});});
 $("syncNow").addEventListener("click",()=>syncFlights());
 async function googleFetch(url,options={}){const res=await fetch(url,{...options,headers:{Authorization:"Bearer "+accessToken,"Content-Type":"application/json",...(options.headers||{})}});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error?.message||("Google API error "+res.status));return data;}
-async function getOrCreateSheet(){let id=localStorage.getItem(SHEET_KEY);if(id){try{await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=spreadsheetId`);return id;}catch(e){localStorage.removeItem(SHEET_KEY);}}
-const created=await googleFetch("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",body:JSON.stringify({properties:{title:"sUAS Flight Log"},sheets:[{properties:{title:"Flights"}}]})});
-id=created.spreadsheetId;localStorage.setItem(SHEET_KEY,id);
-const headers=[["Record ID","Date","Takeoff Time","Landing Time","Flight Hours","Aircraft","Flight Type","Location / Operation","Pilot","Notes","Controller","Operation Type"]];
-await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Flights!A1:L1?valueInputOption=RAW`,{method:"PUT",body:JSON.stringify({values:headers})});
-return id;}
+async function getOrCreateSheet(){
+// All installations use the same user-selected master spreadsheet.
+const id=MASTER_SHEET_ID;
+await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=spreadsheetId`);
+localStorage.setItem(SHEET_KEY,id);
+return id;
+}
 async function syncFlights(){if(syncing)return;if(!accessToken){setSyncMessage("Connect your Google account first.");return;}if(!navigator.onLine){setSyncMessage("You're offline. Flights remain safely queued on this device.");return;}syncing=true;$("syncNow").disabled=true;try{const id=await getOrCreateSheet();const existing=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Flights!A2:A?majorDimension=ROWS`);const ids=new Set((existing.values||[]).flat().map(String));const rows=await getAll();const pending=rows.filter(r=>!ids.has(String(r.id)));if(pending.length){const values=pending.map(r=>{const d=new Date(r.takeoffISO),e=new Date(r.landingISO);return [r.id,d.toLocaleDateString("en-CA"),d.toLocaleTimeString("en-GB",{hour12:false}),e.toLocaleTimeString("en-GB",{hour12:false}),r.flightHours,r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation];});await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Flights!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{method:"POST",body:JSON.stringify({values})});for(const r of pending){r.syncStatus="Synced to Google Sheets";await tx("readwrite",s=>s.put(r));}}
 $("syncMessage").textContent=`Sync complete. ${pending.length} new flight(s) uploaded. ${rows.length-pending.length} already in the spreadsheet.`;$("syncNow").disabled=false;await render();}catch(e){setSyncMessage("Sync could not complete: "+e.message+". Your local records are still saved.");}finally{syncing=false;$("syncNow").disabled=!accessToken;}}
 window.addEventListener("online",()=>{if(accessToken)syncFlights();else setSyncMessage("Internet restored. Connect Google to sync queued flights.");});
