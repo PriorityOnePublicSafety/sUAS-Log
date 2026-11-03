@@ -29,7 +29,36 @@ await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sp
 localStorage.setItem(SHEET_KEY,id);
 return id;
 }
-async function syncFlights(){if(syncing)return;if(!accessToken){setSyncMessage("Connect your Google account first.");return;}if(!navigator.onLine){setSyncMessage("You're offline. Flights remain safely queued on this device.");return;}syncing=true;$("syncNow").disabled=true;try{const id=await getOrCreateSheet();const existing=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Flights!A2:A?majorDimension=ROWS`);const ids=new Set((existing.values||[]).flat().map(String));const rows=await getAll();const pending=rows.filter(r=>!ids.has(String(r.id)));if(pending.length){const values=pending.map(r=>{const d=new Date(r.takeoffISO),e=new Date(r.landingISO);return [r.id,d.toLocaleDateString("en-CA"),d.toLocaleTimeString("en-GB",{hour12:false}),e.toLocaleTimeString("en-GB",{hour12:false}),r.flightHours,r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation];});await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Flights!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{method:"POST",body:JSON.stringify({values})});for(const r of pending){r.syncStatus="Synced to Google Sheets";await tx("readwrite",s=>s.put(r));}}
-$("syncMessage").textContent=`Sync complete. ${pending.length} new flight(s) uploaded. ${rows.length-pending.length} already in the spreadsheet.`;$("syncNow").disabled=false;await render();}catch(e){setSyncMessage("Sync could not complete: "+e.message+". Your local records are still saved.");}finally{syncing=false;$("syncNow").disabled=!accessToken;}}
+async function readSheetRecordIds(id){
+  const range=encodeURIComponent("'Flights'!A:A");
+  const result=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`);
+  return new Set((result.values||[]).slice(1).map(row=>String(row?.[0]??"").trim()).filter(Boolean));
+}
+async function syncFlights(){
+  if(syncing)return;
+  if(!accessToken){setSyncMessage("Connect your Google account first.");return;}
+  if(!navigator.onLine){setSyncMessage("You're offline. Flights remain safely queued on this device.");return;}
+  syncing=true;$("syncNow").disabled=true;
+  try{
+    const id=await getOrCreateSheet();
+    const ids=await readSheetRecordIds(id);
+    const rows=await getAll();
+    const seenLocal=new Set();
+    const pending=rows.filter(r=>{const rid=String(r.id??"").trim();if(!rid||ids.has(rid)||seenLocal.has(rid))return false;seenLocal.add(rid);return true;});
+    if(pending.length){
+      const values=pending.map(r=>{const d=new Date(r.takeoffISO),e=new Date(r.landingISO);return [String(r.id),d.toLocaleDateString("en-CA"),d.toLocaleTimeString("en-GB",{hour12:false}),e.toLocaleTimeString("en-GB",{hour12:false}),r.flightHours,r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation];});
+      const appendRange=encodeURIComponent("'Flights'!A:L");
+      await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${appendRange}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:"POST",body:JSON.stringify({majorDimension:"ROWS",values})});
+      const verified=await readSheetRecordIds(id);
+      const missing=pending.filter(r=>!verified.has(String(r.id).trim()));
+      if(missing.length)throw new Error(`Google Sheets did not confirm ${missing.length} uploaded Record ID(s). No further retry was attempted.`);
+      for(const r of pending){r.syncStatus="Synced to Google Sheets";await tx("readwrite",s=>s.put(r));}
+      verified.forEach(v=>ids.add(v));
+    }
+    $("syncMessage").textContent=`Sync complete. ${pending.length} new flight(s) uploaded. ${rows.length-pending.length} already in the spreadsheet.`;
+    await render();
+  }catch(e){setSyncMessage("Sync could not complete: "+e.message+". Your local records are still saved.");}
+  finally{syncing=false;$("syncNow").disabled=!accessToken;}
+}
 window.addEventListener("online",()=>{if(accessToken)syncFlights();else setSyncMessage("Internet restored. Connect Google to sync queued flights.");});
 (async()=>{db=await openDB();try{active=JSON.parse(localStorage.getItem(ACTIVE)||"null");}catch{}if(active){$("pilot").value=active.pilot;$("aircraft").value=active.aircraft;$("controller").value=active.controller;$("flightType").value=active.flightType;$("operation").value=active.operation;$("location").value=active.location||"";$("notes").value=active.notes||"";}showActive();await render();if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});})();
