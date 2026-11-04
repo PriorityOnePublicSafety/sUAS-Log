@@ -1,4 +1,4 @@
-sUAS Flight Logger - Flight Data Management v7
+sUAS Flight Logger - Flight Data Management v7 (Whole-Minute Duration Update)
 
 Deployment:
 1. Extract this ZIP.
@@ -20,3 +20,13 @@ Important:
 - Never use Replace if this device contains local-only flights that have not been uploaded, unless you intend to discard them.
 - Keep the first/header row of the Flights tab intact and retain columns A:M, including Entry Source in column M.
 - The Google OAuth Client ID is public app configuration. Never add a client secret, private key, password, or access token to this static site.
+
+
+Flight duration update:
+- Flight durations are stored as whole minutes in the local database and Google Sheet column E (Flight Minutes).
+- Live flight duration is rounded to the nearest whole minute when END FLIGHT is selected.
+- Manual duration entry accepts minutes only. When takeoff and landing times are provided, the app calculates and rounds the duration to the nearest minute.
+- On first connection after this update, an existing Flight Hours column is automatically converted from decimal hours to whole minutes and renamed Flight Minutes. The conversion is performed as one Google Sheets batch update.
+- Existing local records stored in decimal hours are migrated to whole minutes on app startup.
+- The total flight time display adds whole minutes and displays hours plus remaining minutes when appropriate.
+- CSV export uses a Flight Minutes column.

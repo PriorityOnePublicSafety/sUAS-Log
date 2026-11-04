@@ -1,4 +1,4 @@
-const CACHE = "suas-flight-logger-v7";
+const CACHE = "suas-flight-logger-v7-minutes";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", event => {

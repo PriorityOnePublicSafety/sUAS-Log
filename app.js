@@ -6,9 +6,22 @@ const $=id=>document.getElementById(id);
 function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:"id"});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 function tx(mode,fn){return new Promise((resolve,reject)=>{const t=db.transaction(STORE,mode),s=t.objectStore(STORE);let result;try{result=fn(s)}catch(e){reject(e);return}t.oncomplete=()=>resolve(result);t.onerror=()=>reject(t.error);});}
 function getAll(){return new Promise((resolve,reject)=>{const r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
+
+async function migrateLocalDurations(){
+  const rows=await getAll();
+  for(const r of rows){
+    if(!Number.isFinite(Number(r.flightMinutes))){
+      r.flightMinutes=getFlightMinutes(r);
+      delete r.flightHours;
+      await tx("readwrite",store=>store.put(r));
+    }
+  }
+}
 function saveActive(){localStorage.setItem(ACTIVE,JSON.stringify(active));}
 function localDate(iso){return new Intl.DateTimeFormat("en-US",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date(iso));}
-function duration(ms){let s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),sec=s%60;return [h,m,sec].map(x=>String(x).padStart(2,"0")).join(":");}
+function getFlightMinutes(r){if(Number.isFinite(Number(r.flightMinutes)))return Math.max(0,Math.round(Number(r.flightMinutes)));if(Number.isFinite(Number(r.flightHours)))return Math.max(0,Math.round(Number(r.flightHours)*60));return 0;}
+function formatMinutes(value){const n=Math.max(0,Math.round(Number(value)||0)),h=Math.floor(n/60),m=n%60;return h?`${h} hr${h===1?"":"s"}${m?` ${m} min`:""}`:`${m} min`;}
+function duration(ms){return formatMinutes(Math.max(0,Math.round(ms/60000)));}
 function dateInputValue(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");}
 function recordDate(r){return r.flightDate|| (r.takeoffISO?dateInputValue(new Date(r.takeoffISO)):"");}
 function recordSortKey(r){return r.takeoffISO?new Date(r.takeoffISO).getTime():new Date((r.flightDate||"1970-01-01")+"T00:00:00").getTime();}
@@ -17,10 +30,10 @@ function showActive(){const box=$("active");box.classList.toggle("hidden",!activ
 function updateElapsed(){if(active)$("elapsed").textContent=duration(Date.now()-new Date(active.takeoffISO).getTime());}
 function formData(){return {pilot:$("pilot").value.trim()||"Jacob Griffin",aircraft:$("aircraft").value,controller:$("controller").value,flightType:$("flightType").value,operation:$("operation").value,location:$("location").value.trim(),notes:$("notes").value.trim()};}
 $("start").addEventListener("click",()=>{if(active)return;active={...formData(),id:crypto.randomUUID(),takeoffISO:new Date().toISOString()};saveActive();showActive();$("message").textContent="Flight started. You can close the app; the active flight is saved on this device.";});
-$("end").addEventListener("click",async()=>{if(!active)return;const landingISO=new Date().toISOString(),hours=(new Date(landingISO)-new Date(active.takeoffISO))/3600000;const record={...active,landingISO,flightHours:Number(hours.toFixed(4)),createdISO:new Date().toISOString(),syncStatus:"Local only"};await tx("readwrite",s=>s.put(record));active=null;localStorage.removeItem(ACTIVE);showActive();$("location").value="";$("notes").value="";await render();$("message").textContent="Flight saved on this device.";if(accessToken)syncFlights();});
-async function render(){const rows=(await getAll()).sort((a,b)=>recordSortKey(b)-recordSortKey(a));$("flightCount").textContent=rows.length;$("totalHours").textContent=rows.reduce((n,r)=>n+r.flightHours,0).toFixed(2);$("history").innerHTML=rows.length?rows.map(r=>`<div class="history-item"><span class="duration">${duration(r.flightHours*3600000)}</span><div class="history-title">${esc(r.aircraft)} · ${esc(r.operation)}</div><div class="history-meta">${esc(recordTimeText(r))}<br>${esc(r.pilot)} · ${esc(r.flightType)} · ${esc(r.controller)}${r.location?"<br>"+esc(r.location):""}<br>${r.entrySource==="Manual Entry"?"✎ Manual entry · ":""}${r.syncStatus==="Synced to Google Sheets"?"☁ Synced":"● Stored on this device"}</div></div>`).join(""):'<p class="empty">No completed flights yet.</p>';}
+$("end").addEventListener("click",async()=>{if(!active)return;const landingISO=new Date().toISOString(),flightMinutes=Math.max(1,Math.round((new Date(landingISO)-new Date(active.takeoffISO))/60000));const record={...active,landingISO,flightMinutes,createdISO:new Date().toISOString(),syncStatus:"Local only"};await tx("readwrite",s=>s.put(record));active=null;localStorage.removeItem(ACTIVE);showActive();$("location").value="";$("notes").value="";await render();$("message").textContent="Flight saved on this device.";if(accessToken)syncFlights();});
+async function render(){const rows=(await getAll()).sort((a,b)=>recordSortKey(b)-recordSortKey(a));$("flightCount").textContent=rows.length;$("totalHours").textContent=formatMinutes(rows.reduce((n,r)=>n+getFlightMinutes(r),0));$("history").innerHTML=rows.length?rows.map(r=>`<div class="history-item"><span class="duration">${formatMinutes(getFlightMinutes(r))}</span><div class="history-title">${esc(r.aircraft)} · ${esc(r.operation)}</div><div class="history-meta">${esc(recordTimeText(r))}<br>${esc(r.pilot)} · ${esc(r.flightType)} · ${esc(r.controller)}${r.location?"<br>"+esc(r.location):""}<br>${r.entrySource==="Manual Entry"?"✎ Manual entry · ":""}${r.syncStatus==="Synced to Google Sheets"?"☁ Synced":"● Stored on this device"}</div></div>`).join(""):'<p class="empty">No completed flights yet.</p>';}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-$("export").addEventListener("click",async()=>{const rows=await getAll();const cols=["Record ID","Date","Takeoff Time","Landing Time","Flight Hours","Aircraft","Flight Type","Location / Operation","Pilot","Notes","Controller","Operation Type","Entry Source"];const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';const data=[cols.join(","),...rows.sort((a,b)=>recordSortKey(a)-recordSortKey(b)).map(r=>{const d=r.takeoffISO?new Date(r.takeoffISO):null,end=r.landingISO?new Date(r.landingISO):null;return [r.id,recordDate(r),d?d.toLocaleTimeString("en-GB",{hour12:false}):"",end?end.toLocaleTimeString("en-GB",{hour12:false}):"",r.flightHours,r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation,r.entrySource||"Live Recorded"].map(q).join(",");})].join("\r\n");const blob=new Blob(["\ufeff"+data],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="sUAS_Flight_Log.csv";a.click();URL.revokeObjectURL(url);});
+$("export").addEventListener("click",async()=>{const rows=await getAll();const cols=["Record ID","Date","Takeoff Time","Landing Time","Flight Minutes","Aircraft","Flight Type","Location / Operation","Pilot","Notes","Controller","Operation Type","Entry Source"];const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';const data=[cols.join(","),...rows.sort((a,b)=>recordSortKey(a)-recordSortKey(b)).map(r=>{const d=r.takeoffISO?new Date(r.takeoffISO):null,end=r.landingISO?new Date(r.landingISO):null;return [r.id,recordDate(r),d?d.toLocaleTimeString("en-GB",{hour12:false}):"",end?end.toLocaleTimeString("en-GB",{hour12:false}):"",getFlightMinutes(r),r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation,r.entrySource||"Live Recorded"].map(q).join(",");})].join("\r\n");const blob=new Blob(["\ufeff"+data],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="sUAS_Flight_Log.csv";a.click();URL.revokeObjectURL(url);});
 function setSyncMessage(s){$("syncMessage").textContent=s;}
 // Local data management. These actions never modify the Google Sheet.
 async function clearLocalData(){
@@ -68,11 +81,11 @@ function safeSheetISO(date,time){
   return Number.isNaN(d.getTime())?null:d.toISOString();
 }
 function sheetRowToRecord(row){
-  const [id,date,takeoff,landing,hours,aircraft,flightType,location,pilot,notes,controller,operation,entrySource]=row;
+  const [id,date,takeoff,landing,minutes,aircraft,flightType,location,pilot,notes,controller,operation,entrySource]=row;
   const flightDate=sheetDate(date),takeoffTime=sheetTime(takeoff),landingTime=sheetTime(landing);
   const makeISO=t=>safeSheetISO(flightDate,t);
-  const flightHours=Number(hours);
-  return {id:String(id??"").trim(),flightDate,takeoffISO:makeISO(takeoffTime),landingISO:makeISO(landingTime),flightHours:Number.isFinite(flightHours)?flightHours:0,aircraft:String(aircraft??""),flightType:String(flightType??""),location:String(location??""),pilot:String(pilot??""),notes:String(notes??""),controller:String(controller??""),operation:String(operation??""),entrySource:String(entrySource??"Live Recorded"),createdISO:new Date().toISOString(),syncStatus:"Synced to Google Sheets"};
+  const flightMinutes=Number(minutes);
+  return {id:String(id??"").trim(),flightDate,takeoffISO:makeISO(takeoffTime),landingISO:makeISO(landingTime),flightMinutes:Number.isFinite(flightMinutes)?Math.max(0,Math.round(flightMinutes)):0,aircraft:String(aircraft??""),flightType:String(flightType??""),location:String(location??""),pilot:String(pilot??""),notes:String(notes??""),controller:String(controller??""),operation:String(operation??""),entrySource:String(entrySource??"Live Recorded"),createdISO:new Date().toISOString(),syncStatus:"Synced to Google Sheets"};
 }
 async function downloadSheetRecords(){
   if(!accessToken)throw new Error("Connect your Google account first.");
@@ -119,17 +132,39 @@ $("connectGoogle").addEventListener("click",()=>{if(!tokenClient){if(window.goog
 $("syncNow").addEventListener("click",()=>syncFlights());
 async function googleFetch(url,options={}){const res=await fetch(url,{cache:"no-store",...options,headers:{Authorization:"Bearer "+accessToken,"Content-Type":"application/json",...(options.headers||{})}});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error?.message||("Google API error "+res.status));return data;}
 async function getOrCreateSheet(){
-// All installations use the same user-selected master spreadsheet.
-const id=MASTER_SHEET_ID;
-await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=spreadsheetId`);
-localStorage.setItem(SHEET_KEY,id);
-// Add the source column for manual/live record identification without changing existing columns.
-const headerRange=encodeURIComponent("'Flights'!M1");
-const header=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${headerRange}`);
-if(header.values?.[0]?.[0]!=="Entry Source"){
-  await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${headerRange}?valueInputOption=RAW`,{method:"PUT",body:JSON.stringify({values:[["Entry Source"]]})});
-}
-return id;
+  const id=MASTER_SHEET_ID;
+  await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=spreadsheetId`);
+  localStorage.setItem(SHEET_KEY,id);
+
+  // One-time migration: old Flight Hours values were decimal hours. Convert them
+  // to whole minutes in the same batch that renames the header, avoiding a
+  // partially migrated sheet if the request fails.
+  const headerRange=encodeURIComponent("'Flights'!E1");
+  const headerResult=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${headerRange}?valueRenderOption=UNFORMATTED_VALUE`);
+  const durationHeader=String(headerResult.values?.[0]?.[0]??"").trim();
+  if(durationHeader==="Flight Hours"){
+    const all=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${encodeURIComponent("'Flights'!A:M")}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`);
+    const rows=all.values||[];
+    const converted=rows.slice(1).map((row,index)=>{
+      const raw=row?.[4];
+      if(raw===undefined||raw===null||raw==="")return [""];
+      const n=Number(raw);
+      if(!Number.isFinite(n)||n<0)throw new Error(`Cannot safely migrate Flight Hours in spreadsheet row ${index+2}. Please check that cell before syncing.`);
+      return [Math.round(n*60)];
+    });
+    const data=[{range:"'Flights'!E1",values:[["Flight Minutes"]]}];
+    if(converted.length)data.push({range:`'Flights'!E2:E${converted.length+1}`,values:converted});
+    await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`,{method:"POST",body:JSON.stringify({valueInputOption:"RAW",data})});
+  }else if(durationHeader!=="Flight Minutes"){
+    throw new Error(`Expected the duration column header to be Flight Hours or Flight Minutes, but found "${durationHeader||"blank"}". No duration data was changed.`);
+  }
+
+  const sourceHeaderRange=encodeURIComponent("'Flights'!M1");
+  const sourceHeader=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${sourceHeaderRange}`);
+  if(sourceHeader.values?.[0]?.[0]!=="Entry Source"){
+    await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${sourceHeaderRange}?valueInputOption=RAW`,{method:"PUT",body:JSON.stringify({values:[["Entry Source"]]})});
+  }
+  return id;
 }
 async function readSheetRecordIds(id){
   const range=encodeURIComponent("'Flights'!A:A");
@@ -148,7 +183,7 @@ async function syncFlights(){
     const seenLocal=new Set();
     const pending=rows.filter(r=>{const rid=String(r.id??"").trim();if(!rid||ids.has(rid)||seenLocal.has(rid))return false;seenLocal.add(rid);return true;});
     if(pending.length){
-      const values=pending.map(r=>{const d=r.takeoffISO?new Date(r.takeoffISO):null,e=r.landingISO?new Date(r.landingISO):null;return [String(r.id),recordDate(r),d?d.toLocaleTimeString("en-GB",{hour12:false}):"",e?e.toLocaleTimeString("en-GB",{hour12:false}):"",r.flightHours,r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation,r.entrySource||"Live Recorded"];});
+      const values=pending.map(r=>{const d=r.takeoffISO?new Date(r.takeoffISO):null,e=r.landingISO?new Date(r.landingISO):null;return [String(r.id),recordDate(r),d?d.toLocaleTimeString("en-GB",{hour12:false}):"",e?e.toLocaleTimeString("en-GB",{hour12:false}):"",getFlightMinutes(r),r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation,r.entrySource||"Live Recorded"];});
       const appendRange=encodeURIComponent("'Flights'!A:M");
       await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${appendRange}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:"POST",body:JSON.stringify({majorDimension:"ROWS",values})});
       const verified=await readSheetRecordIds(id);
@@ -165,14 +200,14 @@ async function syncFlights(){
 
 function setManualMode(){const mode=$("manualMode").value;$("manualTimesGroup").classList.toggle("hidden",mode!=="times");$("manualElapsedGroup").classList.toggle("hidden",mode!=="elapsed");$("manualDurationGroup").classList.toggle("hidden",mode!=="duration");updateManualCalculation();}
 function localDateTime(date,time){return new Date(`${date}T${time}:00`);}
-function elapsedMinutes(hours,minutes){const h=Number(hours||0),m=Number(minutes||0);if(!Number.isInteger(h)||!Number.isInteger(m)||h<0||m<0||m>59)return NaN;return h*60+m;}
-function updateManualCalculation(){const mode=$("manualMode").value,date=$("manualDate").value;let message="Enter the flight details to calculate duration.";try{if(mode==="times"&&date&&$("manualTakeoff").value&&$("manualLanding").value){const start=localDateTime(date,$("manualTakeoff").value),end=localDateTime(date,$("manualLanding").value);if(end<=start)end.setDate(end.getDate()+1);const mins=Math.round((end-start)/60000);message=`Duration: ${duration(mins*60000)} · Landing: ${end.toLocaleString()}`;}else if(mode==="elapsed"&&date&&$("manualElapsedTakeoff").value){const mins=elapsedMinutes($("manualHours").value,$("manualMinutes").value);if(Number.isFinite(mins)&&mins>0){const start=localDateTime(date,$("manualElapsedTakeoff").value),end=new Date(start.getTime()+mins*60000);message=`Duration: ${duration(mins*60000)} · Recorded landing: ${end.toLocaleString()}`;}}else if(mode==="duration"){const mins=elapsedMinutes($("manualDurationHours").value,$("manualDurationMinutes").value);if(Number.isFinite(mins)&&mins>0)message=`Duration: ${duration(mins*60000)} · Takeoff and landing times will be left blank.`;}}catch{}$("manualCalculation").textContent=message;}
+function elapsedMinutes(value){const m=Number(value);return Number.isInteger(m)&&m>0?m:NaN;}
+function updateManualCalculation(){const mode=$("manualMode").value,date=$("manualDate").value;let message="Enter the flight details to calculate duration.";try{if(mode==="times"&&date&&$("manualTakeoff").value&&$("manualLanding").value){const start=localDateTime(date,$("manualTakeoff").value),end=localDateTime(date,$("manualLanding").value);if(end<=start)end.setDate(end.getDate()+1);const mins=Math.round((end-start)/60000);message=`Duration: ${duration(mins*60000)} · Landing: ${end.toLocaleString()}`;}else if(mode==="elapsed"&&date&&$("manualElapsedTakeoff").value){const mins=elapsedMinutes($("manualElapsedMinutes").value);if(Number.isFinite(mins)&&mins>0){const start=localDateTime(date,$("manualElapsedTakeoff").value),end=new Date(start.getTime()+mins*60000);message=`Duration: ${duration(mins*60000)} · Recorded landing: ${end.toLocaleString()}`;}}else if(mode==="duration"){const mins=elapsedMinutes($("manualDurationMinutes").value);if(Number.isFinite(mins)&&mins>0)message=`Duration: ${duration(mins*60000)} · Takeoff and landing times will be left blank.`;}}catch{}$("manualCalculation").textContent=message;}
 $("openManual").addEventListener("click",()=>{$("manualPanel").classList.remove("hidden");$("entryPanel").classList.add("hidden");$("manualDate").value=dateInputValue(new Date());setManualMode();window.scrollTo(0,0);});
 $("closeManual").addEventListener("click",()=>{$("manualPanel").classList.add("hidden");$("entryPanel").classList.remove("hidden");});
 $("manualMode").addEventListener("change",setManualMode);
-["manualDate","manualTakeoff","manualLanding","manualElapsedTakeoff","manualHours","manualMinutes","manualDurationHours","manualDurationMinutes"].forEach(id=>$(id).addEventListener("input",updateManualCalculation));
-$("saveManual").addEventListener("click",async()=>{try{const date=$("manualDate").value,mode=$("manualMode").value;if(!date)throw new Error("Please select the flight date.");let takeoffISO=null,landingISO=null,mins=0;if(mode==="times"){const t=$("manualTakeoff").value,l=$("manualLanding").value;if(!t||!l)throw new Error("Enter both takeoff and landing times.");const start=localDateTime(date,t),end=localDateTime(date,l);if(end<=start)end.setDate(end.getDate()+1);mins=Math.round((end-start)/60000);if(mins<=0)throw new Error("Flight duration must be greater than zero.");takeoffISO=start.toISOString();landingISO=end.toISOString();}else if(mode==="elapsed"){const t=$("manualElapsedTakeoff").value;if(!t)throw new Error("Enter the takeoff time.");mins=elapsedMinutes($("manualHours").value,$("manualMinutes").value);if(!Number.isFinite(mins)||mins<=0)throw new Error("Enter a valid elapsed duration greater than zero.");const start=localDateTime(date,t),end=new Date(start.getTime()+mins*60000);takeoffISO=start.toISOString();landingISO=end.toISOString();}else{mins=elapsedMinutes($("manualDurationHours").value,$("manualDurationMinutes").value);if(!Number.isFinite(mins)||mins<=0)throw new Error("Enter a valid elapsed duration greater than zero.");}
-const record={id:crypto.randomUUID(),flightDate:date,takeoffISO,landingISO,flightHours:Number((mins/60).toFixed(4)),pilot:$("manualPilot").value.trim()||"Jacob Griffin",aircraft:$("manualAircraft").value,controller:$("manualController").value,flightType:$("manualFlightType").value,operation:$("manualOperation").value,location:$("manualLocation").value.trim(),notes:$("manualNotes").value.trim(),entrySource:"Manual Entry",createdISO:new Date().toISOString(),syncStatus:"Local only"};await tx("readwrite",s=>s.put(record));await render();$("manualMessage").textContent="Manual flight saved on this device.";$("manualNotes").value="";$("manualLocation").value="";if(accessToken)syncFlights();}catch(e){$("manualMessage").textContent=e.message;}});
+["manualDate","manualTakeoff","manualLanding","manualElapsedTakeoff","manualElapsedMinutes","manualDurationMinutes"].forEach(id=>$(id).addEventListener("input",updateManualCalculation));
+$("saveManual").addEventListener("click",async()=>{try{const date=$("manualDate").value,mode=$("manualMode").value;if(!date)throw new Error("Please select the flight date.");let takeoffISO=null,landingISO=null,mins=0;if(mode==="times"){const t=$("manualTakeoff").value,l=$("manualLanding").value;if(!t||!l)throw new Error("Enter both takeoff and landing times.");const start=localDateTime(date,t),end=localDateTime(date,l);if(end<=start)end.setDate(end.getDate()+1);mins=Math.round((end-start)/60000);if(mins<=0)throw new Error("Flight duration must be greater than zero.");takeoffISO=start.toISOString();landingISO=end.toISOString();}else if(mode==="elapsed"){const t=$("manualElapsedTakeoff").value;if(!t)throw new Error("Enter the takeoff time.");mins=elapsedMinutes($("manualElapsedMinutes").value);if(!Number.isFinite(mins)||mins<=0)throw new Error("Enter a valid elapsed duration greater than zero.");const start=localDateTime(date,t),end=new Date(start.getTime()+mins*60000);takeoffISO=start.toISOString();landingISO=end.toISOString();}else{mins=elapsedMinutes($("manualDurationMinutes").value);if(!Number.isFinite(mins)||mins<=0)throw new Error("Enter a valid elapsed duration greater than zero.");}
+const record={id:crypto.randomUUID(),flightDate:date,takeoffISO,landingISO,flightMinutes:mins,pilot:$("manualPilot").value.trim()||"Jacob Griffin",aircraft:$("manualAircraft").value,controller:$("manualController").value,flightType:$("manualFlightType").value,operation:$("manualOperation").value,location:$("manualLocation").value.trim(),notes:$("manualNotes").value.trim(),entrySource:"Manual Entry",createdISO:new Date().toISOString(),syncStatus:"Local only"};await tx("readwrite",s=>s.put(record));await render();$("manualMessage").textContent="Manual flight saved on this device.";$("manualNotes").value="";$("manualLocation").value="";if(accessToken)syncFlights();}catch(e){$("manualMessage").textContent=e.message;}});
 
 window.addEventListener("online",()=>{if(accessToken)syncFlights();else setSyncMessage("Internet restored. Connect Google to sync queued flights.");});
-(async()=>{db=await openDB();try{active=JSON.parse(localStorage.getItem(ACTIVE)||"null");}catch{}if(active){$("pilot").value=active.pilot;$("aircraft").value=active.aircraft;$("controller").value=active.controller;$("flightType").value=active.flightType;$("operation").value=active.operation;$("location").value=active.location||"";$("notes").value=active.notes||"";}showActive();await render();if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});})();
+(async()=>{db=await openDB();try{active=JSON.parse(localStorage.getItem(ACTIVE)||"null");}catch{}if(active){$("pilot").value=active.pilot;$("aircraft").value=active.aircraft;$("controller").value=active.controller;$("flightType").value=active.flightType;$("operation").value=active.operation;$("location").value=active.location||"";$("notes").value=active.notes||"";}showActive();await migrateLocalDurations();await render();if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});})();

@@ -29,7 +29,7 @@
 </div>
 <label>Location / Operation<input id="location" placeholder="Enter location or incident"></label>
 <label>Notes<textarea id="notes" rows="2" placeholder="Optional notes"></textarea></label>
-<div id="active" class="active hidden"><div class="active-label">FLIGHT IN PROGRESS</div><div id="startedAt" class="started"></div><div id="elapsed" class="elapsed">00:00:00</div></div>
+<div id="active" class="active hidden"><div class="active-label">FLIGHT IN PROGRESS</div><div id="startedAt" class="started"></div><div id="elapsed" class="elapsed">0 min</div></div>
 <div class="actions"><button id="start" class="start">START FLIGHT</button><button id="end" class="end" disabled>END FLIGHT</button></div>
 <p id="message" class="message" role="status">Your records are saved on this device.</p>
 </section>
@@ -51,14 +51,12 @@
 <div id="manualElapsedGroup" class="hidden">
 <label>Takeoff time<input id="manualElapsedTakeoff" type="time"></label>
 <div class="grid">
-<label>Elapsed hours<input id="manualHours" type="number" min="0" max="999" step="1" inputmode="numeric" placeholder="0"></label>
-<label>Elapsed minutes<input id="manualMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0"></label>
+<label>Flight duration (minutes)<input id="manualElapsedMinutes" type="number" min="1" max="999" step="1" inputmode="numeric" placeholder="5"></label>
 </div>
 </div>
 <div id="manualDurationGroup" class="hidden">
 <div class="grid">
-<label>Elapsed hours<input id="manualDurationHours" type="number" min="0" max="999" step="1" inputmode="numeric" placeholder="0"></label>
-<label>Elapsed minutes<input id="manualDurationMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0"></label>
+<label>Flight duration (minutes)<input id="manualDurationMinutes" type="number" min="1" max="999" step="1" inputmode="numeric" placeholder="5"></label>
 </div>
 </div>
 <div class="calculated" id="manualCalculation" aria-live="polite">Enter the flight details to calculate duration.</div>
@@ -76,7 +74,7 @@
 </section>
 <section class="panel">
 <div class="section-head"><h2>Flight history</h2><div class="history-actions"><button id="export" class="secondary">Export CSV</button><button id="clearLocalTests" class="danger-secondary">CLEAR LOCAL DATA</button></div></div>
-<div class="stats"><div><strong id="flightCount">0</strong><span>Flights</span></div><div><strong id="totalHours">0.00</strong><span>Flight hours</span></div></div>
+<div class="stats"><div><strong id="flightCount">0</strong><span>Flights</span></div><div><strong id="totalHours">0.00</strong><span>Total flight time</span></div></div>
 <div id="history" class="history"><p class="empty">No completed flights yet.</p></div>
 </section>
 <section class="footnote">Flight records are stored locally on this device and can sync to your shared Google Sheet. Export a CSV regularly for an additional backup.</section>
