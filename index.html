@@ -12,9 +12,11 @@
 <main>
 <section class="panel" id="syncPanel">
 <h2>Google Sheets sync</h2>
-<p class="sync-note">Connect your Google account to create a private flight log spreadsheet. Flights remain saved on this device and can sync when you are back online.</p>
+<p class="sync-note">Your Google Sheet is the master flight log. Sync uploads new local flights; the data-management tools below download records back to this device.</p>
 <div class="sync-actions"><button id="connectGoogle" class="secondary">CONNECT GOOGLE ACCOUNT</button><button id="syncNow" class="secondary" disabled>SYNC FLIGHTS</button></div>
+<div class="data-actions"><button id="mergeFromSheet" class="secondary" disabled>MERGE FROM GOOGLE SHEETS</button><button id="replaceFromSheet" class="secondary" disabled>REPLACE LOCAL DATA FROM SHEET</button></div>
 <p id="syncMessage" class="message" role="status">Not connected. Local flight logging works offline.</p>
+<p class="sync-note">Merge adds spreadsheet records that are missing locally. Replace removes this device’s flight records and reloads the spreadsheet copy. Neither action uploads or changes spreadsheet records.</p>
 </section>
 <section class="panel" id="entryPanel">
 <div class="section-head"><h2>Live flight tracking</h2><button id="openManual" class="secondary">MANUAL FLIGHT ENTRY</button></div>
@@ -73,7 +75,7 @@
 <p id="manualMessage" class="message" role="status">Manual entries are saved on this device and can sync to Google Sheets.</p>
 </section>
 <section class="panel">
-<div class="section-head"><h2>Flight history</h2><button id="export" class="secondary">Export CSV</button></div>
+<div class="section-head"><h2>Flight history</h2><div class="history-actions"><button id="export" class="secondary">Export CSV</button><button id="clearLocalTests" class="danger-secondary">CLEAR LOCAL DATA</button></div></div>
 <div class="stats"><div><strong id="flightCount">0</strong><span>Flights</span></div><div><strong id="totalHours">0.00</strong><span>Flight hours</span></div></div>
 <div id="history" class="history"><p class="empty">No completed flights yet.</p></div>
 </section>

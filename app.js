@@ -22,7 +22,83 @@ async function render(){const rows=(await getAll()).sort((a,b)=>recordSortKey(b)
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 $("export").addEventListener("click",async()=>{const rows=await getAll();const cols=["Record ID","Date","Takeoff Time","Landing Time","Flight Hours","Aircraft","Flight Type","Location / Operation","Pilot","Notes","Controller","Operation Type","Entry Source"];const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';const data=[cols.join(","),...rows.sort((a,b)=>recordSortKey(a)-recordSortKey(b)).map(r=>{const d=r.takeoffISO?new Date(r.takeoffISO):null,end=r.landingISO?new Date(r.landingISO):null;return [r.id,recordDate(r),d?d.toLocaleTimeString("en-GB",{hour12:false}):"",end?end.toLocaleTimeString("en-GB",{hour12:false}):"",r.flightHours,r.aircraft,r.flightType,r.location,r.pilot,r.notes,r.controller,r.operation,r.entrySource||"Live Recorded"].map(q).join(",");})].join("\r\n");const blob=new Blob(["\ufeff"+data],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="sUAS_Flight_Log.csv";a.click();URL.revokeObjectURL(url);});
 function setSyncMessage(s){$("syncMessage").textContent=s;}
-function initGoogle(){if(!window.google?.accounts?.oauth2){setSyncMessage("Google sign-in is loading. If it does not appear, reload while online.");return;}tokenClient=google.accounts.oauth2.initTokenClient({client_id:window.GOOGLE_OAUTH_CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.file",callback:async(resp)=>{if(resp.error){setSyncMessage("Google sign-in failed: "+resp.error);return;}accessToken=resp.access_token;$("syncNow").disabled=false;$("connectGoogle").textContent="GOOGLE ACCOUNT CONNECTED";setSyncMessage("Connected for this session. Select Sync Flights to create or update your private spreadsheet.");await syncFlights();}});tokenClient.requestAccessToken({prompt:"consent"});}
+// Local data management. These actions never modify the Google Sheet.
+async function clearLocalData(){
+  const confirmed=window.confirm("Delete ALL flight records stored on THIS device, including any active flight? This cannot be undone. Your Google Sheet and Google connection settings will not be changed.");
+  if(!confirmed)return;
+  try{
+    await tx("readwrite",store=>store.clear());
+    active=null;localStorage.removeItem(ACTIVE);showActive();
+    await render();
+    $("message").textContent="Local flight records cleared on this device. Your Google Sheet and connection settings were preserved.";
+    setSyncMessage("Local records cleared. Use Merge or Replace from Google Sheets to restore records to this device.");
+  }catch(e){$("message").textContent="Could not clear local records: "+e.message;}
+}
+$("clearLocalTests").addEventListener("click",clearLocalData);
+
+function sheetDate(value){
+  const v=String(value??"").trim();
+  if(!v)return "";
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;
+  const d=new Date(v);if(!Number.isNaN(d.getTime()))return dateInputValue(d);
+  // Google Sheets may return a serial date when a cell was formatted as a date.
+  const n=Number(v);if(Number.isFinite(n)&&n>20000&&n<80000){const d2=new Date(Date.UTC(1899,11,30)+n*86400000);return d2.toISOString().slice(0,10);}
+  return "";
+}
+function sheetTime(value){
+  const v=String(value??"").trim();if(!v)return "";
+  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(v)){const a=v.split(":");return a[0].padStart(2,"0")+":"+a[1].padStart(2,"0")+(a[2]?":"+a[2].padStart(2,"0"): ":00");}
+  const n=Number(v);if(Number.isFinite(n)&&n>=0&&n<1){const sec=Math.round(n*86400);return [Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(x=>String(x).padStart(2,"0")).join(":");}
+  return "";
+}
+function sheetRowToRecord(row){
+  const [id,date,takeoff,landing,hours,aircraft,flightType,location,pilot,notes,controller,operation,entrySource]=row;
+  const flightDate=sheetDate(date),takeoffTime=sheetTime(takeoff),landingTime=sheetTime(landing);
+  const makeISO=t=>flightDate&&t?new Date(`${flightDate}T${t}`).toISOString():null;
+  const flightHours=Number(hours);
+  return {id:String(id??"").trim(),flightDate,takeoffISO:makeISO(takeoffTime),landingISO:makeISO(landingTime),flightHours:Number.isFinite(flightHours)?flightHours:0,aircraft:String(aircraft??""),flightType:String(flightType??""),location:String(location??""),pilot:String(pilot??""),notes:String(notes??""),controller:String(controller??""),operation:String(operation??""),entrySource:String(entrySource??"Live Recorded"),createdISO:new Date().toISOString(),syncStatus:"Synced to Google Sheets"};
+}
+async function downloadSheetRecords(){
+  if(!accessToken)throw new Error("Connect your Google account first.");
+  if(!navigator.onLine)throw new Error("You are offline. Connect to the internet first.");
+  const id=await getOrCreateSheet();
+  const range=encodeURIComponent("'Flights'!A:M");
+  const result=await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`);
+  const rows=(result.values||[]).slice(1),seen=new Set(),records=[];
+  for(const row of rows){const record=sheetRowToRecord(row);if(!record.id||seen.has(record.id))continue;seen.add(record.id);records.push(record);}
+  return records;
+}
+async function setDataButtonsEnabled(enabled){$("mergeFromSheet").disabled=!enabled;$("replaceFromSheet").disabled=!enabled;}
+async function mergeFromSheet(){
+  if(syncing)return;syncing=true;await setDataButtonsEnabled(false);$("syncNow").disabled=true;
+  try{
+    setSyncMessage("Reading flight records from Google Sheets…");
+    const remote=await downloadSheetRecords(),local=await getAll(),localIds=new Set(local.map(r=>String(r.id)));
+    const missing=remote.filter(r=>!localIds.has(r.id));
+    if(missing.length)await tx("readwrite",store=>missing.forEach(r=>store.put(r)));
+    await render();setSyncMessage(`Merge complete. ${missing.length} record(s) added from Google Sheets; ${local.length} existing local record(s) preserved.`);
+  }catch(e){setSyncMessage("Could not merge spreadsheet data: "+e.message+". Existing local records were preserved.");}
+  finally{syncing=false;await setDataButtonsEnabled(!!accessToken);$("syncNow").disabled=!accessToken;}
+}
+async function replaceFromSheet(){
+  if(syncing)return;
+  if(active&&!window.confirm("A flight is currently in progress. Replacing local data will discard that active flight too. Continue?"))return;
+  if(!window.confirm("Replace ALL flight records on THIS device with the records currently in Google Sheets? Local-only records not yet uploaded will be deleted. The Google Sheet will not be changed."))return;
+  syncing=true;await setDataButtonsEnabled(false);$("syncNow").disabled=true;
+  try{
+    setSyncMessage("Reading the master spreadsheet before replacing local records…");
+    const remote=await downloadSheetRecords();
+    await tx("readwrite",store=>{store.clear();remote.forEach(r=>store.put(r));});
+    active=null;localStorage.removeItem(ACTIVE);showActive();await render();
+    $("message").textContent="Local flight history replaced with the Google Sheets copy.";
+    setSyncMessage(`Replace complete. ${remote.length} flight record(s) loaded from Google Sheets. No spreadsheet data was changed.`);
+  }catch(e){setSyncMessage("Could not replace local data: "+e.message+". The existing local database was not intentionally cleared.");}
+  finally{syncing=false;await setDataButtonsEnabled(!!accessToken);$("syncNow").disabled=!accessToken;}
+}
+$("mergeFromSheet").addEventListener("click",mergeFromSheet);
+$("replaceFromSheet").addEventListener("click",replaceFromSheet);
+
+function initGoogle(){if(!window.google?.accounts?.oauth2){setSyncMessage("Google sign-in is loading. If it does not appear, reload while online.");return;}tokenClient=google.accounts.oauth2.initTokenClient({client_id:window.GOOGLE_OAUTH_CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.file",callback:async(resp)=>{if(resp.error){setSyncMessage("Google sign-in failed: "+resp.error);return;}accessToken=resp.access_token;$("syncNow").disabled=false;await setDataButtonsEnabled(true);$("connectGoogle").textContent="GOOGLE ACCOUNT CONNECTED";setSyncMessage("Connected for this session. Select Sync Flights to create or update your private spreadsheet.");await syncFlights();}});tokenClient.requestAccessToken({prompt:"consent"});}
 $("connectGoogle").addEventListener("click",()=>{if(!tokenClient){if(window.google?.accounts?.oauth2)initGoogle();else setSyncMessage("Google sign-in is still loading. Please try again in a moment.");}else tokenClient.requestAccessToken({prompt:""});});
 $("syncNow").addEventListener("click",()=>syncFlights());
 async function googleFetch(url,options={}){const res=await fetch(url,{cache:"no-store",...options,headers:{Authorization:"Bearer "+accessToken,"Content-Type":"application/json",...(options.headers||{})}});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error?.message||("Google API error "+res.status));return data;}

@@ -2,3 +2,7 @@
 .sync-note{font-size:13px;color:#647286;line-height:1.5;margin:-5px 0 12px}.sync-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sync-actions button:disabled{opacity:.45}
 
 .calculated{background:#edf4f8;border-radius:10px;padding:12px;margin:2px 0 14px;font-size:13px;line-height:1.5;color:#29435c}.full-width{width:100%;margin-top:5px}.section-head{gap:10px}.section-head button{flex-shrink:0}
+
+.history-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.danger-secondary{background:#f8e9e9;color:#8b2929;padding:10px 13px;min-height:40px;font-size:12px}
+
+.data-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.data-actions button{font-size:12px;line-height:1.25}.data-actions button:disabled{opacity:.45}@media(max-width:390px){.data-actions{grid-template-columns:1fr}}

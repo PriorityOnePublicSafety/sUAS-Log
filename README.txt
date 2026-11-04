@@ -1,30 +1,22 @@
-sUAS FLIGHT LOGGER — GOOGLE SHEETS SYNC FIX (v5)
+sUAS Flight Logger - Flight Data Management v8
 
-WHAT THIS UPDATE CHANGES
-- Prevents the service worker from intercepting or caching Google Sheets API and other cross-origin requests.
-- Makes Google API requests bypass the browser HTTP cache.
-- Activates the new service worker immediately and claims open app clients.
-- Uses network-first loading for same-origin app files, with cached fallback when offline.
-- Keeps the existing IndexedDB database and records unchanged.
-- Keeps the shared master spreadsheet ID configured in app.js.
+Deployment:
+1. Extract this ZIP.
+2. Upload all files in this folder to the root of the existing GitHub repository, replacing files with the same names.
+3. Keep the repository and Google Sheet. Do not create a new repository or spreadsheet.
+4. Wait for GitHub Pages to finish deploying.
+5. On each device, refresh the hosted app so it loads v8.
 
-DEPLOYMENT
-1. Download and extract this ZIP.
-2. In the GitHub repository, upload and replace the existing files with these files (keep them at the repository root).
-3. Wait for GitHub Pages to finish deploying.
-4. On iPhone, fully close the Home Screen app, open the Pages URL in Safari while online, refresh once, then reopen the Home Screen app.
-5. Reconnect Google and sync twice without creating a new flight. The second sync should report 0 new flights if the first sync completed.
+Google Sheets data management:
+- SYNC FLIGHTS uploads local records whose Record IDs are not already in the master spreadsheet.
+- MERGE FROM GOOGLE SHEETS downloads rows from the Flights tab and adds only Record IDs missing from this device. Existing local records are preserved.
+- REPLACE LOCAL DATA FROM SHEET downloads the Flights tab and replaces this device's local flight history. Local-only records not present in the sheet are discarded. The app asks for confirmation before replacing.
+- CLEAR LOCAL DATA deletes flight records from this device only. It does not change the Google Sheet or Google connection settings.
 
-IMPORTANT
-- Do not delete website data, uninstall the PWA, or clear IndexedDB. Your locally stored flight records are preserved by this update.
-- Do not delete duplicate spreadsheet rows during this test; keep a backup first.
-- The Google OAuth Client ID is public by design. Never put passwords, client secrets, private keys, or access tokens in GitHub.
-
-
-VERSION 6 - MANUAL FLIGHT ENTRY
-- Adds a dedicated Manual Flight Entry page.
-- Supports takeoff + landing times, takeoff + elapsed duration, and duration-only records.
-- Calculates landing time from takeoff + elapsed duration and saves it as the landing time.
-- Duration-only records retain blank takeoff and landing times.
-- Manual entries use unique IDs, local IndexedDB storage, CSV export, and existing Google Sheets duplicate-safe sync.
-- Existing database and local flight records are preserved.
+Important:
+- Google Sheets remains the shared master copy. Clear, Merge, and Replace do not edit spreadsheet contents.
+- Each device has its own local database. Run the desired action separately on iPhone and desktop.
+- Connect Google while online before using Merge or Replace.
+- Never use Replace if this device contains local-only flights that have not been uploaded, unless you intend to discard them.
+- Keep the first/header row of the Flights tab intact and retain columns A:M, including Entry Source in column M.
+- The Google OAuth Client ID is public app configuration. Never add a client secret, private key, password, or access token to this static site.
