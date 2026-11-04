@@ -1,11 +1,11 @@
-sUAS Flight Logger - Flight Data Management v8
+sUAS Flight Logger - Flight Data Management v7
 
 Deployment:
 1. Extract this ZIP.
 2. Upload all files in this folder to the root of the existing GitHub repository, replacing files with the same names.
 3. Keep the repository and Google Sheet. Do not create a new repository or spreadsheet.
 4. Wait for GitHub Pages to finish deploying.
-5. On each device, refresh the hosted app so it loads v8.
+5. On each device, refresh the hosted app so it loads v7.
 
 Google Sheets data management:
 - SYNC FLIGHTS uploads local records whose Record IDs are not already in the master spreadsheet.

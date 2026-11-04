@@ -39,22 +39,38 @@ $("clearLocalTests").addEventListener("click",clearLocalData);
 function sheetDate(value){
   const v=String(value??"").trim();
   if(!v)return "";
-  if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;
-  const d=new Date(v);if(!Number.isNaN(d.getTime()))return dateInputValue(d);
-  // Google Sheets may return a serial date when a cell was formatted as a date.
-  const n=Number(v);if(Number.isFinite(n)&&n>20000&&n<80000){const d2=new Date(Date.UTC(1899,11,30)+n*86400000);return d2.toISOString().slice(0,10);}
+  // Accept ISO dates only when the calendar date is real.
+  const iso=v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(iso){const y=Number(iso[1]),m=Number(iso[2]),d=Number(iso[3]);const check=new Date(Date.UTC(y,m-1,d));return check.getUTCFullYear()===y&&check.getUTCMonth()===m-1&&check.getUTCDate()===d?v:"";}
+  // Google Sheets may return a serial date when a cell is formatted as a date.
+  const n=Number(v);
+  if(Number.isFinite(n)&&n>20000&&n<80000){const dt=new Date(Date.UTC(1899,11,30)+n*86400000);return Number.isNaN(dt.getTime())?"":dt.toISOString().slice(0,10);}
+  const parsed=new Date(v);if(!Number.isNaN(parsed.getTime()))return dateInputValue(parsed);
   return "";
 }
 function sheetTime(value){
-  const v=String(value??"").trim();if(!v)return "";
-  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(v)){const a=v.split(":");return a[0].padStart(2,"0")+":"+a[1].padStart(2,"0")+(a[2]?":"+a[2].padStart(2,"0"): ":00");}
-  const n=Number(v);if(Number.isFinite(n)&&n>=0&&n<1){const sec=Math.round(n*86400);return [Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(x=>String(x).padStart(2,"0")).join(":");}
+  if(value===null||value===undefined||value==="")return "";
+  const v=String(value).trim();if(!v)return "";
+  // Google Sheets UNFORMATTED_VALUE normally returns times as a fraction of a day.
+  const n=Number(v);
+  if(Number.isFinite(n)&&n>=0&&n<1){const sec=Math.round(n*86400)%86400;return [Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(x=>String(x).padStart(2,"0")).join(":");}
+  // Accept 24-hour times and validate each component before creating a Date.
+  const m=v.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if(m){const h=Number(m[1]),min=Number(m[2]),sec=Number(m[3]||0);if(h<=23&&min<=59&&sec<=59)return [h,min,sec].map(x=>String(x).padStart(2,"0")).join(":");return "";}
+  // Also accept common 12-hour values if the sheet was formatted as text.
+  const ap=v.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if(ap){let h=Number(ap[1]),min=Number(ap[2]),sec=Number(ap[3]||0);if(h<1||h>12||min>59||sec>59)return "";h=h%12+(ap[4].toUpperCase()==="PM"?12:0);return [h,min,sec].map(x=>String(x).padStart(2,"0")).join(":");}
   return "";
+}
+function safeSheetISO(date,time){
+  if(!date||!time)return null;
+  const d=new Date(`${date}T${time}`);
+  return Number.isNaN(d.getTime())?null:d.toISOString();
 }
 function sheetRowToRecord(row){
   const [id,date,takeoff,landing,hours,aircraft,flightType,location,pilot,notes,controller,operation,entrySource]=row;
   const flightDate=sheetDate(date),takeoffTime=sheetTime(takeoff),landingTime=sheetTime(landing);
-  const makeISO=t=>flightDate&&t?new Date(`${flightDate}T${t}`).toISOString():null;
+  const makeISO=t=>safeSheetISO(flightDate,t);
   const flightHours=Number(hours);
   return {id:String(id??"").trim(),flightDate,takeoffISO:makeISO(takeoffTime),landingISO:makeISO(landingTime),flightHours:Number.isFinite(flightHours)?flightHours:0,aircraft:String(aircraft??""),flightType:String(flightType??""),location:String(location??""),pilot:String(pilot??""),notes:String(notes??""),controller:String(controller??""),operation:String(operation??""),entrySource:String(entrySource??"Live Recorded"),createdISO:new Date().toISOString(),syncStatus:"Synced to Google Sheets"};
 }
