@@ -19,3 +19,12 @@ IMPORTANT
 - Do not delete website data, uninstall the PWA, or clear IndexedDB. Your locally stored flight records are preserved by this update.
 - Do not delete duplicate spreadsheet rows during this test; keep a backup first.
 - The Google OAuth Client ID is public by design. Never put passwords, client secrets, private keys, or access tokens in GitHub.
+
+
+VERSION 6 - MANUAL FLIGHT ENTRY
+- Adds a dedicated Manual Flight Entry page.
+- Supports takeoff + landing times, takeoff + elapsed duration, and duration-only records.
+- Calculates landing time from takeoff + elapsed duration and saves it as the landing time.
+- Duration-only records retain blank takeoff and landing times.
+- Manual entries use unique IDs, local IndexedDB storage, CSV export, and existing Google Sheets duplicate-safe sync.
+- Existing database and local flight records are preserved.

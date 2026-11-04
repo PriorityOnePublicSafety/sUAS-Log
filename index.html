@@ -17,7 +17,7 @@
 <p id="syncMessage" class="message" role="status">Not connected. Local flight logging works offline.</p>
 </section>
 <section class="panel" id="entryPanel">
-<h2>Flight entry</h2>
+<div class="section-head"><h2>Live flight tracking</h2><button id="openManual" class="secondary">MANUAL FLIGHT ENTRY</button></div>
 <label>Pilot / Operator<input id="pilot" value="Jacob Griffin" autocomplete="name"></label>
 <div class="grid">
 <label>Aircraft<select id="aircraft"><option>Mini 3</option><option>Air 3s</option><option>Matrice 210</option><option>Matrice 4TD</option></select></label>
@@ -31,12 +31,53 @@
 <div class="actions"><button id="start" class="start">START FLIGHT</button><button id="end" class="end" disabled>END FLIGHT</button></div>
 <p id="message" class="message" role="status">Your records are saved on this device.</p>
 </section>
+
+<section class="panel hidden" id="manualPanel">
+<div class="section-head"><h2>Manual flight entry</h2><button id="closeManual" class="secondary">BACK</button></div>
+<p class="sync-note">Enter a previous flight or a flight that was not tracked live. The duration and landing time are calculated when applicable.</p>
+<label>Flight date<input id="manualDate" type="date" required></label>
+<label>Time information
+<select id="manualMode">
+<option value="times">Takeoff and landing times</option>
+<option value="elapsed">Takeoff time and elapsed duration</option>
+<option value="duration">Duration only (no times available)</option>
+</select></label>
+<div id="manualTimesGroup" class="grid">
+<label>Takeoff time<input id="manualTakeoff" type="time"></label>
+<label>Landing time<input id="manualLanding" type="time"></label>
+</div>
+<div id="manualElapsedGroup" class="hidden">
+<label>Takeoff time<input id="manualElapsedTakeoff" type="time"></label>
+<div class="grid">
+<label>Elapsed hours<input id="manualHours" type="number" min="0" max="999" step="1" inputmode="numeric" placeholder="0"></label>
+<label>Elapsed minutes<input id="manualMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0"></label>
+</div>
+</div>
+<div id="manualDurationGroup" class="hidden">
+<div class="grid">
+<label>Elapsed hours<input id="manualDurationHours" type="number" min="0" max="999" step="1" inputmode="numeric" placeholder="0"></label>
+<label>Elapsed minutes<input id="manualDurationMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0"></label>
+</div>
+</div>
+<div class="calculated" id="manualCalculation" aria-live="polite">Enter the flight details to calculate duration.</div>
+<label>Pilot / Operator<input id="manualPilot" value="Jacob Griffin" autocomplete="name"></label>
+<div class="grid">
+<label>Aircraft<select id="manualAircraft"><option>Mini 3</option><option>Air 3s</option><option>Matrice 210</option><option>Matrice 4TD</option></select></label>
+<label>Controller<select id="manualController"><option>Remote</option><option>Dronesense</option></select></label>
+<label>Flight type<select id="manualFlightType"><option>LOS</option><option>BVLOS</option></select></label>
+<label>Operation type<select id="manualOperation"><option>Training</option><option>Emergency Response</option><option>Search &amp; Rescue</option><option>Incident Overwatch</option><option>Mapping / Survey</option><option>Test / Maintenance</option><option>Other</option></select></label>
+</div>
+<label>Location / Operation<input id="manualLocation" placeholder="Enter location or incident"></label>
+<label>Notes<textarea id="manualNotes" rows="3" placeholder="Optional notes or historical log reference"></textarea></label>
+<button id="saveManual" class="start full-width">SAVE MANUAL FLIGHT</button>
+<p id="manualMessage" class="message" role="status">Manual entries are saved on this device and can sync to Google Sheets.</p>
+</section>
 <section class="panel">
 <div class="section-head"><h2>Flight history</h2><button id="export" class="secondary">Export CSV</button></div>
 <div class="stats"><div><strong id="flightCount">0</strong><span>Flights</span></div><div><strong id="totalHours">0.00</strong><span>Flight hours</span></div></div>
 <div id="history" class="history"><p class="empty">No completed flights yet.</p></div>
 </section>
-<section class="footnote">This first version stores records locally on this iPhone/browser. Export a CSV regularly for backup. Google account synchronization and shared pilot accounts are planned as the next phase.</section>
+<section class="footnote">Flight records are stored locally on this device and can sync to your shared Google Sheet. Export a CSV regularly for an additional backup.</section>
 </main>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>window.GOOGLE_OAUTH_CLIENT_ID = "615484333604-velouc741rmhu9vlt9jko8o1ae6m2v49.apps.googleusercontent.com";</script>
