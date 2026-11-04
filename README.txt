@@ -37,3 +37,8 @@ Dashboard update (v7)
 - Period filter: all time, year to date, last 12 months, and this month.
 - Breakdowns: monthly activity, aircraft, operation/mission, LOS/BVLOS, and pilot.
 - All figures are calculated from this device's local records. Merge from Google Sheets to include records from another device.
+
+Flight history notes display update:
+- Flight notes are now displayed directly below the location in each flight-history entry.
+- Notes retain line breaks and are HTML-escaped before display.
+- Existing local and spreadsheet records are unchanged; no data migration is required.
