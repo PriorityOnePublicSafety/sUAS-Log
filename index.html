@@ -10,6 +10,23 @@
 <body>
 <header><div class="eyebrow">PERSONAL FLIGHT RECORDS</div><h1>sUAS Flight Logger</h1><div id="connection" class="status">● Offline-ready · Local storage</div></header>
 <main>
+<section class="panel dashboard-panel" id="dashboardPanel">
+<div class="section-head"><div><div class="eyebrow dark-eyebrow">FLIGHT ANALYTICS</div><h2>Flight Summary Dashboard</h2></div><label class="period-label">Period<select id="dashboardPeriod"><option value="all">All time</option><option value="year">Year to date</option><option value="12m">Last 12 months</option><option value="month">This month</option></select></label></div>
+<div class="dashboard-kpis">
+<div class="kpi"><strong id="dashFlights">0</strong><span>Flights</span></div>
+<div class="kpi"><strong id="dashMinutes">0 min</strong><span>Total flight time</span></div>
+<div class="kpi"><strong id="dashAircraft">0</strong><span>Aircraft flown</span></div>
+<div class="kpi"><strong id="dashYearMinutes">0 min</strong><span>Flight time this year</span></div>
+</div>
+<div class="dashboard-grid">
+<div class="dash-card"><h3>Monthly flight time</h3><p class="dash-subtitle">Hours and minutes by month</p><div id="monthlyChart" class="monthly-chart"><p class="empty">No flight data yet.</p></div></div>
+<div class="dash-card"><h3>Flight hours by aircraft</h3><p class="dash-subtitle">Flight count, total time, and share of flight time for the selected period</p><div id="aircraftBreakdown" class="aircraft-breakdown"></div></div>
+<div class="dash-card"><h3>Flight time by mission</h3><div id="missionChart" class="bar-chart"></div></div>
+<div class="dash-card"><h3>Flight time by flight type</h3><div id="flightTypeChart" class="bar-chart"></div></div>
+<div class="dash-card"><h3>Flight time by pilot</h3><div id="pilotChart" class="bar-chart"></div></div>
+</div>
+<p class="dashboard-footnote">Dashboard figures are calculated from records stored on this device. Merge from Google Sheets to include flights logged on another device. Works offline.</p>
+</section>
 <section class="panel" id="syncPanel">
 <h2>Google Sheets sync</h2>
 <p class="sync-note">Your Google Sheet is the master flight log. Sync uploads new local flights; the data-management tools below download records back to this device.</p>

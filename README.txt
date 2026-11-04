@@ -30,3 +30,10 @@ Flight duration update:
 - Existing local records stored in decimal hours are migrated to whole minutes on app startup.
 - The total flight time display adds whole minutes and displays hours plus remaining minutes when appropriate.
 - CSV export uses a Flight Minutes column.
+
+Dashboard update (v7)
+- Adds an offline-capable Flight Summary Dashboard at the top of the app.
+- KPIs: flight count, total flight minutes, average flight duration, and aircraft count.
+- Period filter: all time, year to date, last 12 months, and this month.
+- Breakdowns: monthly activity, aircraft, operation/mission, LOS/BVLOS, and pilot.
+- All figures are calculated from this device's local records. Merge from Google Sheets to include records from another device.
